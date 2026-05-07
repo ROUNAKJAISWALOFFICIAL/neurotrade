@@ -147,7 +147,7 @@ async function fetchLivePrice(symbol) {
     const stock = STOCKS[symbol];
 
     const response = await axios.get(
-      "https://api.upstox.com/v3/market-quote/ltp",
+      "https://api.upstox.com/v2/market-quote/quotes",
       {
         params: {
           instrument_key: stock.instrumentKey
@@ -166,7 +166,10 @@ async function fetchLivePrice(symbol) {
 
     return {
       price: Number(quote.last_price),
-      prevClose: Number(quote.cp)
+      prevClose: Number(quote.ohlc.close),
+      high: Number(quote.ohlc.high),
+      low: Number(quote.ohlc.low),
+      volume: Number(quote.volume)
     };
   } catch (error) {
     console.error(
@@ -176,7 +179,10 @@ async function fetchLivePrice(symbol) {
 
     return {
       price: prices[symbol],
-      prevClose: dayOpen[symbol] || prices[symbol]
+      prevClose: dayOpen[symbol] || prices[symbol],
+      high: prices[symbol],
+      low: prices[symbol],
+      volume: 0
     };
   }
 }
@@ -185,9 +191,10 @@ function startPriceSimulator(io) {
   if (simulatorInterval) clearInterval(simulatorInterval);
 
   simulatorInterval = setInterval(async () => {
+    // We continue fetching even if market is closed to show the last traded price
+    // instead of defaulting to random/base prices.
     if (!isMarketOpen()) {
-      console.log("⏸ Market closed - using cached prices");
-      return;
+      console.log("⏸ Market closed - showing last traded price");
     }
 
     const updates = [];
@@ -214,9 +221,9 @@ const changePct = (change / open) * 100;
         change: +change.toFixed(2),
         changePct: +changePct.toFixed(2),
         open: +open.toFixed(2),
-        high: +(Math.max(price, open)).toFixed(2),
-        low: +(Math.min(price, open)).toFixed(2),
-        volume: 1000000,
+        high: +(liveData.high || price).toFixed(2),
+        low: +(liveData.low || price).toFixed(2),
+        volume: liveData.volume || 0,
         name: STOCKS[sym].name,
         sector: STOCKS[sym].sector,
         exchange: STOCKS[sym].exchange,

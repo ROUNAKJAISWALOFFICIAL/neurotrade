@@ -2,23 +2,13 @@ const mongoose = require('mongoose');
 
 const tradeSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  symbol: { type: String, required: true, uppercase: true },
-  stockName: { type: String },
+  symbol: { type: String, required: true },
   type: { type: String, enum: ['BUY', 'SELL'], required: true },
-  orderType: { type: String, enum: ['MARKET', 'LIMIT', 'SL'], default: 'MARKET' },
-  quantity: { type: Number, required: true, min: 1 },
+  qty: { type: Number, required: true },
   price: { type: Number, required: true },
-  totalValue: { type: Number, required: true },
-  stopLoss: { type: Number },
-  target: { type: Number },
-  status: { type: String, enum: ['PENDING', 'EXECUTED', 'CANCELLED'], default: 'EXECUTED' },
+  total: { type: Number, required: true },
   pnl: { type: Number, default: 0 },
-  pnlPct: { type: Number, default: 0 },
-  exchange: { type: String, default: 'NSE' },
-  executedAt: { type: Date, default: Date.now },
-}, { timestamps: true });
-
-tradeSchema.index({ userId: 1, symbol: 1 });
-tradeSchema.index({ userId: 1, executedAt: -1 });
+  timestamp: { type: Date, default: Date.now }
+});
 
 module.exports = mongoose.model('Trade', tradeSchema);

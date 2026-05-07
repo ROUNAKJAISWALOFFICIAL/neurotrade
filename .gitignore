@@ -8,10 +8,10 @@ yarn-error.log*
 dist/
 build/
 
-# Environment variables (VERY IMPORTANT)
-.env
-.env.*
-!.env.example
+
+# Java / Spring Boot
+target/
+*.class
 
 # Python
 venv/
@@ -25,6 +25,6 @@ Thumbs.db
 # Logs
 *.log
 
-# Optional (good practice)
+# IDE
 .idea/
 .vscode/

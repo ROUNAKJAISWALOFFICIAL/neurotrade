@@ -3,9 +3,9 @@ import { useStore, STOCKS } from '../store';
 import { fmtPrice } from '../utils/format';
 
 export default function TradeForm({ symbol }) {
-  const { prices, balance, holdings, executeTrade, addToast } = useStore();
-  const [side, setSide] = useState('BUY');
-  const [orderType, setOrderType] = useState('MARKET');
+  const { prices, balance, holdings, token, addToast, setBalance, setHoldings, setOrders } = useStore();
+  const [side, setSide] = useState('BUY'); // Corrected: Default to 'BUY'
+  const [orderType, setOrderType] = useState('MARKET'); // Added: Separate state for orderType
   const [qty, setQty] = useState(1);
   const [price, setPrice] = useState('');
   const [sl, setSl] = useState('');
@@ -24,15 +24,40 @@ export default function TradeForm({ symbol }) {
   const holding = holdings[symbol];
   const maxSell = holding?.qty || 0;
 
-  const handleSubmit = () => {
-    const result = executeTrade(symbol, side, qty, execPrice);
-    if (result.ok) {
+  const handleSubmit = async () => {
+    try {
+      const res = await fetch('/api/trades/execute', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ symbol, side, qty, price: execPrice })
+      });
+      
+      const result = await res.json();
+      
+      if (!res.ok) throw new Error(result.error);
+
+      // Re-fetch state to keep UI in sync with DB
+      const [hRes, oRes] = await Promise.all([
+        fetch('/api/trades/holdings', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/trades/orders', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      
+      const hData = await hRes.json();
+      const oData = await oRes.json();
+
+      setBalance(result.balance);
+      setHoldings(hData.holdings.reduce((acc, h) => ({ ...acc, [h.symbol]: h }), {}));
+      setOrders(oData.orders);
+
       const msg = side === 'BUY'
         ? `Bought ${qty} × ${symbol.replace('.NS','')} @ ₹${execPrice.toFixed(2)}`
-        : `Sold ${qty} × ${symbol.replace('.NS','')} @ ₹${execPrice.toFixed(2)} · P&L ₹${result.pnl?.toFixed(0) || 0}`;
+        : `Sold ${qty} × ${symbol.replace('.NS','')} @ ₹${execPrice.toFixed(2)}`;
       addToast({ type: side === 'BUY' ? 'buy' : 'sell', title: `${side} Executed`, message: msg });
-    } else {
-      addToast({ type: 'error', title: 'Order Failed', message: result.error });
+    } catch (err) {
+      addToast({ type: 'error', title: 'Order Failed', message: err.message });
     }
   };
 
@@ -47,7 +72,9 @@ export default function TradeForm({ symbol }) {
               ? 'bg-emerald-500 text-white'
               : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
           }`}
-        >↑ BUY</button>
+        >
+          ↑ BUY
+        </button>
         <button
           onClick={() => setSide('SELL')}
           className={`flex-1 py-2 rounded-lg text-[12px] font-bold transition-all ${

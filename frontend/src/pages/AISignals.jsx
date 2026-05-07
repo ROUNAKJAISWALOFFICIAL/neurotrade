@@ -88,8 +88,8 @@ export default function AISignals() {
       )
     : 0;
 
-  const handleTrade = (sig) => {
-    const result = executeTrade(
+  const handleTrade = async (sig) => {
+    const result = await executeTrade(
       sig.symbol,
       sig.signal,
       1,

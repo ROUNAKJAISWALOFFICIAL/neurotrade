@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useStore } from '../store';
 
 const api = axios.create({
   baseURL: '/api',
@@ -18,6 +19,9 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('te_token');
+      const logout = useStore.getState().logout;
+      if (typeof logout === 'function') logout();
+      window.location.href = '/login';
     }
     return Promise.reject(err);
   }

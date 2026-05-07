@@ -4,20 +4,14 @@ import { motion } from 'framer-motion';
 import { useStore } from '../store';
 import api from '../utils/api';
 
+
 export default function Login() {
   const navigate = useNavigate();
   const { setUser, setToken, setBalance } = useStore();
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ username: '', email: 'demo@tradeedge.in', password: 'demo123' });
+  const [form, setForm] = useState({ username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const handleDemo = () => {
-    setUser({ _id: 'demo', username: 'DemoTrader', email: 'demo@tradeedge.in', balance: 100000 });
-    setToken('demo_token');
-    setBalance(100000);
-    navigate('/');
-  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -30,8 +24,8 @@ export default function Login() {
       setBalance(data.user.balance || 100000);
       navigate('/');
     } catch (err) {
-      // Backend not running — use demo mode
-      handleDemo();
+      const message = err.response?.data?.error || err.message || 'Unable to authenticate';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -93,20 +87,9 @@ export default function Login() {
             </button>
           </div>
 
-          <div className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-white/[0.07]" />
-            <span className="text-[11px] text-[#5a6478]">or</span>
-            <div className="flex-1 h-px bg-white/[0.07]" />
+          <div className="text-center text-[11px] text-[#5a6478] mt-4">
+            Please sign in or register to continue.
           </div>
-
-          <button onClick={handleDemo}
-            className="w-full py-3 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-white rounded-xl font-medium text-[14px] transition-all">
-            ▶ Continue as Demo Trader
-          </button>
-
-          <p className="text-center text-[11px] text-[#5a6478] mt-4">
-            Demo starts with ₹1,00,000 virtual balance
-          </p>
         </div>
       </motion.div>
     </div>

@@ -10,10 +10,9 @@ const axios   = require('axios');
 const {
   getCurrentPrices,
   getPrice,
-  getPriceData,
   getStockList,
-  INSTRUMENT_MAP,
-} = require('../services/priceService');
+  getStockBySymbol,
+} = require('../services/priceSimulator');
 
 const ACCESS_TOKEN = process.env.UPSTOX_ACCESS_TOKEN;
 
@@ -39,9 +38,10 @@ router.get('/prices', (req, res) => {
 // ─── GET /stocks/price/:symbol  ───────────────────────────────────────────────
 router.get('/price/:symbol', (req, res) => {
   const { symbol } = req.params;
-  const data = getPriceData(symbol);
-  if (!data || !data.price) return res.status(404).json({ error: 'Symbol not found or no price yet' });
-  res.json({ ...data, timestamp: Date.now() });
+  const price = getPrice(symbol);
+  const stock = getStockBySymbol(symbol);
+  if (!stock) return res.status(404).json({ error: 'Symbol not found' });
+  res.json({ symbol, price: price || stock.basePrice, timestamp: Date.now() });
 });
 
 // ─── GET /stocks/list  ────────────────────────────────────────────────────────
@@ -56,8 +56,9 @@ router.get('/history/:symbol', async (req, res) => {
   const { symbol } = req.params;
   const { interval = '1D' } = req.query;
 
-  const instrumentKey = INSTRUMENT_MAP[symbol];
-  if (!instrumentKey) return res.status(404).json({ error: 'Symbol not found' });
+  const stock = getStockBySymbol(symbol);
+  const instrumentKey = stock?.instrumentKey;
+  if (!instrumentKey) return res.status(404).json({ error: 'Symbol or Instrument Key not found' });
 
   // Map frontend interval codes → Upstox interval strings
   const intervalMap = {
@@ -142,14 +143,15 @@ router.get('/search', (req, res) => {
 // Live quote from Upstox REST (backup when WebSocket isn't connected)
 router.get('/quote/:symbol', async (req, res) => {
   const { symbol } = req.params;
-  const instrumentKey = INSTRUMENT_MAP[symbol];
-  if (!instrumentKey) return res.status(404).json({ error: 'Symbol not found' });
+  const stock = getStockBySymbol(symbol);
+  const instrumentKey = stock?.instrumentKey;
+  if (!instrumentKey) return res.status(404).json({ error: 'Symbol or Instrument Key not found' });
 
   try {
     const { data } = await upstox.get('/market-quote/ltp', {
       params: { instrument_key: instrumentKey },
     });
-    const ltp = data?.data?.[instrumentKey]?.last_price || 0;
+    const ltp = data?.data?.[Object.keys(data.data)[0]]?.last_price || 0;
     res.json({ symbol, price: ltp, timestamp: Date.now() });
   } catch (err) {
     res.status(502).json({ error: 'Failed to fetch live quote', detail: err.message });

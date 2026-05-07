@@ -17,12 +17,14 @@ export default function Portfolio() {
   const pl = currentVal - invested;
   const plPct = invested > 0 ? (pl / invested) * 100 : 0;
 
-  const handleExit = (sym) => {
+  const handleExit = async (sym) => {
     const h = holdings[sym];
     const ltp = prices[sym]?.price || STOCKS[sym]?.basePrice || 0;
-    const result = executeTrade(sym, 'SELL', h.qty, ltp);
+    const result = await executeTrade(sym, 'SELL', h.qty, ltp);
     if (result.ok) {
       addToast({ type: 'sell', title: 'Position Closed', message: `Exited ${sym.replace('.NS','')} · P&L ${result.pnl >= 0 ? '+' : ''}₹${result.pnl?.toFixed(0)}` });
+    } else {
+      addToast({ type: 'error', title: 'Order Failed', message: result.error });
     }
   };
 

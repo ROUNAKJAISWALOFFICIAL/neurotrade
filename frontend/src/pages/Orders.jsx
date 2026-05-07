@@ -76,7 +76,7 @@ export default function Orders() {
                     <span className="px-2 py-[2px] rounded-md text-[10px] font-medium bg-emerald-500/15 text-emerald-400">{o.status}</span>
                   </td>
                   <td className="px-4 py-3 text-[#5a6478] text-[11px]">
-                    {new Date(o.time).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
+                    {new Date(o.timestamp || o.time).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
                   </td>
                 </tr>
               ))}

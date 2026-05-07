@@ -1,121 +1,85 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { getPrice } = require('../services/priceSimulator');
+const User = require('../models/User');
+const Trade = require('../models/Trade');
+const Holding = require('../models/Holding');
 
-// In-memory fallback store
-const memStore = { holdings: {}, orders: [], balance: {} };
+// Execute a trade
+router.post('/execute', auth, async (req, res) => {
+  const { symbol, side, qty, price } = req.body;
+  const userId = req.user.id;
 
-let Trade, Holding, User;
-try {
-  Trade = require('../models/Trade');
-  Holding = require('../models/Holding');
-  User = require('../models/User');
-} catch {}
-
-// Place order
-router.post('/order', auth, async (req, res) => {
   try {
-    const { symbol, type, quantity, price, orderType = 'MARKET', stopLoss, target } = req.body;
-    const userId = req.user._id || req.user.id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (!symbol || !type || !quantity) {
-      return res.status(400).json({ error: 'Symbol, type and quantity required' });
-    }
+    const totalCost = qty * price;
+    let holding = await Holding.findOne({ userId, symbol });
+    let tradePnl = 0;
 
-    const execPrice = price || getPrice(symbol) || 0;
-    if (!execPrice) return res.status(400).json({ error: 'Invalid symbol or price' });
-
-    const totalValue = execPrice * quantity;
-
-    try {
-      // DB mode
-      const user = await User.findById(userId);
-      if (!user) throw new Error('User not found');
-
-      if (type === 'BUY') {
-        if (user.balance < totalValue) return res.status(400).json({ error: 'Insufficient balance' });
-        user.balance -= totalValue;
-        
-        let holding = await Holding.findOne({ userId, symbol });
-        if (holding) {
-          const newAvg = (holding.avgPrice * holding.quantity + execPrice * quantity) / (holding.quantity + quantity);
-          holding.avgPrice = newAvg;
-          holding.quantity += quantity;
-          holding.totalInvested += totalValue;
-        } else {
-          holding = new Holding({ userId, symbol, quantity, avgPrice: execPrice, totalInvested: totalValue });
-        }
-        await holding.save();
-      } else {
-        let holding = await Holding.findOne({ userId, symbol });
-        if (!holding || holding.quantity < quantity) return res.status(400).json({ error: 'Insufficient holdings' });
-        
-        const pnl = (execPrice - holding.avgPrice) * quantity;
-        user.balance += totalValue;
-        holding.quantity -= quantity;
-        holding.totalInvested -= holding.avgPrice * quantity;
-        if (holding.quantity === 0) await holding.deleteOne();
-        else await holding.save();
-      }
-
-      await user.save();
-
-      const trade = await Trade.create({ userId, symbol, type, quantity, price: execPrice, totalValue, orderType, stopLoss, target, status: 'EXECUTED' });
+    if (side === 'BUY') {
+      if (user.balance < totalCost) return res.status(400).json({ error: 'Insufficient balance' });
       
-      const io = req.app.get('io');
-      io.to(`portfolio:${userId}`).emit('portfolio:update', { type: 'order', trade });
-
-      return res.status(201).json({ trade, newBalance: user.balance });
-    } catch (dbErr) {
-      // Offline/memory fallback
-      const uid = userId.toString();
-      if (!memStore.balance[uid]) memStore.balance[uid] = 100000;
-      if (!memStore.holdings[uid]) memStore.holdings[uid] = {};
-
-      const balance = memStore.balance[uid];
-
-      if (type === 'BUY') {
-        if (balance < totalValue) return res.status(400).json({ error: 'Insufficient balance' });
-        memStore.balance[uid] -= totalValue;
-        const h = memStore.holdings[uid][symbol];
-        if (h) {
-          h.avgPrice = (h.avgPrice * h.quantity + execPrice * quantity) / (h.quantity + quantity);
-          h.quantity += quantity;
-        } else {
-          memStore.holdings[uid][symbol] = { symbol, quantity, avgPrice: execPrice };
-        }
+      user.balance -= totalCost;
+      
+      if (!holding) {
+        holding = new Holding({ userId, symbol, qty, avgPrice: price });
       } else {
-        const h = memStore.holdings[uid]?.[symbol];
-        if (!h || h.quantity < quantity) return res.status(400).json({ error: 'Insufficient holdings' });
-        memStore.balance[uid] += totalValue;
-        h.quantity -= quantity;
-        if (h.quantity === 0) delete memStore.holdings[uid][symbol];
+        const newTotalQty = holding.qty + qty;
+        holding.avgPrice = (holding.avgPrice * holding.qty + totalCost) / newTotalQty;
+        holding.qty = newTotalQty;
       }
-
-      const trade = { _id: Date.now(), userId, symbol, type, quantity, price: execPrice, totalValue, status: 'EXECUTED', executedAt: new Date() };
-      memStore.orders.unshift(trade);
-
-      return res.status(201).json({ trade, newBalance: memStore.balance[uid] });
+    } else {
+      if (!holding || holding.qty < qty) return res.status(400).json({ error: 'Insufficient holdings' });
+      
+      tradePnl = (price - holding.avgPrice) * qty;
+      user.balance += totalCost;
+      holding.qty -= qty;
+      
+      if (holding.qty === 0) {
+        await Holding.deleteOne({ _id: holding._id });
+        holding = null;
+      }
     }
+
+    if (holding) await holding.save();
+    await user.save();
+
+    const trade = await Trade.create({
+      userId,
+      symbol,
+      type: side,
+      qty,
+      price,
+      total: totalCost,
+      pnl: tradePnl
+    });
+
+    res.json({ success: true, balance: user.balance, trade });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get order history
-router.get('/history', auth, async (req, res) => {
+// Get user holdings
+router.get('/holdings', auth, async (req, res) => {
   try {
-    const userId = req.user._id || req.user.id;
-    const { page = 1, limit = 50 } = req.query;
-    try {
-      const trades = await Trade.find({ userId }).sort({ executedAt: -1 }).limit(parseInt(limit)).skip((page - 1) * limit);
-      res.json({ trades });
-    } catch {
-      const uid = userId.toString();
-      res.json({ trades: memStore.orders.filter(o => o.userId === uid) });
-    }
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const holdings = await Holding.find({ userId: req.user.id });
+    res.json({ holdings });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get trade history
+router.get('/orders', auth, async (req, res) => {
+  try {
+    const orders = await Trade.find({ userId: req.user.id }).sort({ timestamp: -1 });
+    res.json({ orders });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

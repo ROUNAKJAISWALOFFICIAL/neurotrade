@@ -70,11 +70,12 @@ const initPrices = () => {
     const base = STOCKS[sym].basePrice;
 
     p[sym] = {
-      price: base + (Math.random() - 0.5) * base * 0.01,
+      price: base,
       open: base,
       change: 0,
       changePct: 0,
       volume: 0,
+      prevPrice: base,
     };
   });
 
@@ -153,87 +154,56 @@ export const useStore = create((set, get) => ({
       orders: [order, ...s.orders],
     })),
 
-  // --- Execute trade locally ---
-  executeTrade: (symbol, type, qty, price) => {
+  // --- Execute trade through backend persistence ---
+  executeTrade: async (symbol, type, qty, price) => {
     const state = get();
-    const total = price * qty;
+    const token = state.token || localStorage.getItem('te_token');
+    if (!token) {
+      return { ok: false, error: 'Authentication required' };
+    }
 
-    if (type === 'BUY') {
-      if (state.balance < total) {
-        return { ok: false, error: 'Insufficient balance' };
-      }
-
-      const h = state.holdings[symbol] || {
-        qty: 0,
-        avgPrice: 0,
-      };
-
-      const newAvg =
-        (h.avgPrice * h.qty + price * qty) / (h.qty + qty);
-
-      set({
-        balance: state.balance - total,
-        holdings: {
-          ...state.holdings,
-          [symbol]: {
-            qty: h.qty + qty,
-            avgPrice: newAvg,
-          },
+    try {
+      const res = await fetch('/api/trades/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        orders: [
-          {
-            id: Date.now(),
-            symbol,
-            type,
-            qty,
-            price,
-            total,
-            time: new Date(),
-            status: 'EXECUTED',
-          },
-          ...state.orders,
-        ],
+        body: JSON.stringify({ symbol, side: type, qty, price }),
       });
 
-      return { ok: true };
-    } else {
-      const h = state.holdings[symbol];
-
-      if (!h || h.qty < qty) {
-        return {
-          ok: false,
-          error: 'Insufficient holdings',
-        };
+      const data = await res.json();
+      if (!res.ok) {
+        return { ok: false, error: data.error || 'Order failed' };
       }
 
-      const pnl = (price - h.avgPrice) * qty;
-      const newQty = h.qty - qty;
+      const headers = { Authorization: `Bearer ${token}` };
+      const [holdRes, orderRes] = await Promise.all([
+        fetch('/api/trades/holdings', { headers }),
+        fetch('/api/trades/orders', { headers }),
+      ]);
+      const [holdData, orderData] = await Promise.all([holdRes.json(), orderRes.json()]);
 
-      const newHoldings = { ...state.holdings };
+      if (holdData.holdings) {
+        set({
+          holdings: holdData.holdings.reduce((acc, h) => ({ ...acc, [h.symbol]: h }), {}),
+        });
+      }
+      if (orderData.orders) {
+        set({ orders: orderData.orders });
+      }
+      if (data.balance !== undefined) {
+        set({ balance: data.balance });
+      }
 
-      if (newQty === 0) delete newHoldings[symbol];
-      else newHoldings[symbol] = { ...h, qty: newQty };
-
-      set({
-        balance: state.balance + total,
-        holdings: newHoldings,
-        orders: [
-          {
-            id: Date.now(),
-            symbol,
-            type,
-            qty,
-            price,
-            total,
-            pnl,
-            time: new Date(),
-            status: 'EXECUTED',
-          },
-          ...state.orders,
-        ],
-      });
-
-      return { ok: true, pnl };
+      return {
+        ok: true,
+        trade: data.trade,
+        pnl: data.trade?.pnl,
+        balance: data.balance,
+      };
+    } catch (err) {
+      return { ok: false, error: err.message || 'Order failed' };
     }
   },
 

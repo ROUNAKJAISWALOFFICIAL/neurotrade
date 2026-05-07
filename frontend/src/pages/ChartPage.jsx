@@ -11,6 +11,15 @@ import { generateClientSignal } from '../utils/signals';
 const INTERVALS = ['1m','5m','15m','1D','1W'];
 const CHART_TYPES = ['candle','line','area'];
 
+function isMarketOpen() {
+  const now = new Date();
+  const day = now.getDay();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const openTime = 9 * 60 + 15;
+  const closeTime = 15 * 60 + 30;
+  return day >= 1 && day <= 5 && minutes >= openTime && minutes <= closeTime;
+}
+
 export default function ChartPage() {
   const { currentSymbol, setCurrentSymbol, prices, chartType, setChartType, chartInterval, setChartInterval, executeTrade, addToast } = useStore();
 
@@ -41,11 +50,11 @@ export default function ChartPage() {
     return () => clearInterval(id);
   }, [currentSymbol, ltp]);
 
-  const handleSignalTrade = (sig) => {
+  const handleSignalTrade = async (sig) => {
     const qty = 1;
     const price = sig.price;
     const type = sig.signal;
-    const result = executeTrade(sig.symbol, type, qty, price);
+    const result = await executeTrade(sig.symbol, type, qty, price);
     if (result.ok) {
       addToast({ type: type === 'BUY' ? 'buy' : 'sell', title: `${type} Executed`, message: `${qty} × ${sig.symbol.replace('.NS','')} @ ₹${price.toFixed(2)}` });
     } else {
@@ -69,8 +78,10 @@ export default function ChartPage() {
           </div>
         ))}
         <div className="ml-auto flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 live-dot inline-block" />
-          <span className="text-[11px] text-emerald-400 font-medium">LIVE</span>
+          <span className={`w-2 h-2 rounded-full live-dot inline-block ${isMarketOpen() ? 'bg-emerald-400' : 'bg-red-400'}`} />
+          <span className={`text-[11px] font-medium ${isMarketOpen() ? 'text-emerald-400' : 'text-red-400'}`}>
+            Market {isMarketOpen() ? 'Live' : 'Closed'}
+          </span>
         </div>
       </div>
 
@@ -235,7 +246,7 @@ function OrdersTable({ orders }) {
               {o.pnl != null ? `${o.pnl>=0?'+':''}₹${Math.abs(o.pnl).toFixed(0)}` : '—'}
             </td>
             <td className="px-4 py-[9px] text-[#5a6478] text-[11px]">
-              {new Date(o.time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
+              {new Date(o.timestamp || o.time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
             </td>
           </tr>
         ))}

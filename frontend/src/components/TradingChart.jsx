@@ -2,44 +2,6 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { createChart, CrosshairMode } from 'lightweight-charts';
 import { useStore, STOCKS } from '../store';
 
-function generateCandles(basePrice, count = 150, intervalSec = 86400) {
-  let price = basePrice;
-  const now = Math.floor(Date.now() / 1000);
-  const candles = [];
-
-  for (let i = count; i >= 0; i--) {
-    const open = price;
-
-    const volatility =
-      intervalSec <= 60 ? 0.0015 :
-      intervalSec <= 300 ? 0.002 :
-      intervalSec <= 900 ? 0.003 :
-      0.005;
-
-    const change = (Math.random() - 0.5) * price * volatility;
-    const close = open + change;
-
-    const high =
-      Math.max(open, close) + Math.random() * price * volatility * 0.5;
-
-    const low =
-      Math.min(open, close) - Math.random() * price * volatility * 0.5;
-
-    candles.push({
-      time: now - i * intervalSec,
-      open: +open.toFixed(2),
-      high: +high.toFixed(2),
-      low: +low.toFixed(2),
-      close: +close.toFixed(2),
-      volume: Math.floor(100000 + Math.random() * 500000),
-    });
-
-    price = close;
-  }
-
-  return candles;
-}
-
 const INTERVAL_SECONDS = {
   '1m': 60,
   '5m': 300,
@@ -75,16 +37,34 @@ export default function TradingChart({ symbol, interval, chartType }) {
     }
   };
 
-  const buildChart = useCallback(() => {
+  const buildChart = useCallback(async () => {
     if (!containerRef.current) return;
-
-    destroyChart();
 
     const stock = STOCKS[symbol];
     if (!stock) return;
 
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight || 400;
+
+    // Fetch real historical candles from Backend/Upstox
+    let candles = [];
+    try {
+      const res = await fetch(`/api/stocks/history/${symbol}?interval=${interval}`);
+      const data = await res.json();
+      if (data.candles && data.candles.length > 0) {
+        candles = data.candles;
+      }
+    } catch (err) {
+      console.error("Failed to fetch real history:", err);
+    }
+
+    if (candles.length === 0) {
+      // Fallback or empty state if API fails
+      return;
+    }
+
+    destroyChart();
+    candleDataRef.current[`${symbol}-${interval}`] = candles;
 
     const chart = createChart(containerRef.current, {
       width,
@@ -126,19 +106,6 @@ export default function TradingChart({ symbol, interval, chartType }) {
 
     chartRef.current = chart;
 
-    const ivSec = INTERVAL_SECONDS[interval] || 86400;
-    const key = `${symbol}-${interval}`;
-
-    // generate candles only once per symbol+interval
-    if (!candleDataRef.current[key]) {
-      candleDataRef.current[key] = generateCandles(
-        stock.basePrice,
-        interval === '1W' ? 52 : interval === '1m' ? 200 : 150,
-        ivSec
-      );
-    }
-
-    const candles = candleDataRef.current[key];
 
     const volData = candles.map((c) => ({
       time: c.time,
