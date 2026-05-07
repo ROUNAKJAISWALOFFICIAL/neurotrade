@@ -24,17 +24,68 @@ const upstox = axios.create({
   },
 });
 
-// ─── GET /stocks/prices  ──────────────────────────────────────────────────────
-// Returns latest cached prices from the WebSocket feed (sub-second freshness)
-router.get('/prices', (req, res) => {
+router.get('/prices', async (req, res) => {
   try {
-    const prices = getCurrentPrices().filter(p => p.price > 0);
-    res.json({ prices, timestamp: Date.now() });
+    const stocks = getStockList();
+
+    const results = [];
+
+    for (const [symbol, stock] of Object.entries(stocks)) {
+      try {
+        const response = await upstox.get('/market-quote/ltp', {
+          params: {
+            instrument_key: stock.instrumentKey,
+          },
+        });
+
+        const dataKey = Object.keys(response.data.data)[0];
+
+        const ltp =
+          response.data.data[dataKey]?.last_price || stock.basePrice;
+
+        results.push({
+          symbol,
+          price: ltp,
+          open: stock.basePrice,
+          high: ltp,
+          low: ltp,
+          prevClose: stock.basePrice,
+          change: ltp - stock.basePrice,
+          changePct:
+            ((ltp - stock.basePrice) / stock.basePrice) * 100,
+          volume: 0,
+          timestamp: Date.now(),
+        });
+      } catch (err) {
+        console.log(`Failed ${symbol}`);
+
+        results.push({
+          symbol,
+          price: stock.basePrice,
+          open: stock.basePrice,
+          high: stock.basePrice,
+          low: stock.basePrice,
+          prevClose: stock.basePrice,
+          change: 0,
+          changePct: 0,
+          volume: 0,
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    res.json({
+      prices: results,
+      timestamp: Date.now(),
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err.message);
+
+    res.status(500).json({
+      error: err.message,
+    });
   }
 });
-
 // ─── GET /stocks/price/:symbol  ───────────────────────────────────────────────
 router.get('/price/:symbol', (req, res) => {
   const { symbol } = req.params;

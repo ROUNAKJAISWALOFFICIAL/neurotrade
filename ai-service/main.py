@@ -9,12 +9,24 @@ from ta.momentum import RSIIndicator
 from ta.trend import MACD, EMAIndicator
 import os
 from dotenv import load_dotenv
+import google.generativeai as genai
+import json
+import re
 
 load_dotenv()
 
+# ─────────────────────────────────────────
+# ENV
+# ─────────────────────────────────────────
 ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-app = FastAPI(title="TradeEdge AI Service", version="3.0.0")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+app = FastAPI(title="TradeEdge AI Service", version="4.0.0")
 
 # ─────────────────────────────────────────
 # CORS
@@ -28,7 +40,7 @@ app.add_middleware(
 )
 
 # ─────────────────────────────────────────
-# Models
+# MODEL
 # ─────────────────────────────────────────
 class AnalyzeRequest(BaseModel):
     instrument_key: str
@@ -36,11 +48,11 @@ class AnalyzeRequest(BaseModel):
 
 
 # ─────────────────────────────────────────
-# Fetch Candle Data (Upstox)
+# FETCH CANDLES
 # ─────────────────────────────────────────
 def fetch_candles(instrument_key: str):
     if not ACCESS_TOKEN:
-        raise ValueError("Missing UPSTOX_ACCESS_TOKEN in .env")
+        raise ValueError("Missing UPSTOX_ACCESS_TOKEN")
 
     today = date.today()
     from_date = today - timedelta(days=60)
@@ -58,131 +70,133 @@ def fetch_candles(instrument_key: str):
     response = httpx.get(url, headers=headers)
 
     if response.status_code != 200:
-        raise ValueError(f"Upstox API Error: {response.text}")
+        raise ValueError(response.text)
 
-    result = response.json()
-
-    candles = result.get("data", {}).get("candles", [])
+    candles = response.json().get("data", {}).get("candles", [])
 
     if not candles:
-        raise ValueError("No candle data received")
+        raise ValueError("No candle data")
 
     df = pd.DataFrame(
         candles,
         columns=["timestamp", "open", "high", "low", "close", "volume", "oi"]
     )
 
-    # Convert numeric
     for col in ["open", "high", "low", "close", "volume"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
     df.dropna(inplace=True)
-
     return df
 
 
 # ─────────────────────────────────────────
-# Indicator Calculation
+# INDICATORS
 # ─────────────────────────────────────────
-def compute_indicators(df: pd.DataFrame):
+def compute_indicators(df):
     close = df["close"]
 
-    rsi_series = RSIIndicator(close).rsi()
-    macd_obj = MACD(close)
+    rsi = RSIIndicator(close).rsi()
+    macd = MACD(close)
 
-    df["rsi"] = rsi_series
-    df["macd"] = macd_obj.macd()
-    df["macd_signal"] = macd_obj.macd_signal()
-    df["ema20"] = EMAIndicator(close, window=20).ema_indicator()
-    df["ema50"] = EMAIndicator(close, window=50).ema_indicator()
-
-    df["vol_avg"] = df["volume"].rolling(20).mean()
+    df["rsi"] = rsi
+    df["macd"] = macd.macd()
+    df["macd_signal"] = macd.macd_signal()
+    df["ema20"] = EMAIndicator(close, 20).ema_indicator()
+    df["ema50"] = EMAIndicator(close, 50).ema_indicator()
 
     latest = df.iloc[-1]
 
-    vol_ratio = latest["volume"] / latest["vol_avg"] if latest["vol_avg"] else 1
-
     return {
-        "price": round(float(latest["close"]), 2),
-        "rsi": round(float(latest["rsi"]), 1),
-        "macd": round(float(latest["macd"]), 2),
-        "macd_signal": round(float(latest["macd_signal"]), 2),
-        "ema_signal": 1 if latest["ema20"] > latest["ema50"] else -1,
-        "vol_ratio": round(float(vol_ratio), 2)
+        "price": float(latest["close"]),
+        "rsi": float(latest["rsi"]),
+        "macd": float(latest["macd"]),
+        "macd_signal": float(latest["macd_signal"]),
+        "trend": "UP" if latest["ema20"] > latest["ema50"] else "DOWN"
     }
 
 
 # ─────────────────────────────────────────
-# Signal Logic (Improved)
+# SAFE GEMINI PARSER
+# ─────────────────────────────────────────
+def clean_json(text: str):
+    text = text.strip()
+
+    # remove markdown
+    text = re.sub(r"```json", "", text)
+    text = re.sub(r"```", "", text)
+
+    return text.strip()
+
+
+def gemini_sentiment(indicators):
+    if not GEMINI_API_KEY:
+        return {
+            "signal": "HOLD",
+            "confidence": 50,
+            "reason": "No Gemini API key"
+        }
+
+    prompt = f"""
+You are a professional stock market analyst.
+
+Return ONLY valid JSON.
+
+Data:
+Price: {indicators['price']}
+RSI: {indicators['rsi']}
+MACD: {indicators['macd']}
+MACD Signal: {indicators['macd_signal']}
+Trend: {indicators['trend']}
+
+Format:
+{{
+  "signal": "BUY | SELL | HOLD",
+  "confidence": 0-100,
+  "reason": "short explanation"
+}}
+"""
+
+    try:
+        res = model.generate_content(prompt)
+        text = clean_json(res.text)
+
+        return json.loads(text)
+
+    except Exception as e:
+        print("Gemini error:", e)
+
+        return {
+            "signal": "HOLD",
+            "confidence": 50,
+            "reason": "Fallback (AI error)"
+        }
+
+
+# ─────────────────────────────────────────
+# MAIN SIGNAL ENGINE
 # ─────────────────────────────────────────
 def generate_signal(instrument_key: str):
     df = fetch_candles(instrument_key)
-    ind = compute_indicators(df)
+    indicators = compute_indicators(df)
+    ai = gemini_sentiment(indicators)
 
-    score = 0
-    reasons = []
-
-    # RSI
-    if ind["rsi"] < 35:
-        score += 2
-        reasons.append("RSI oversold")
-    elif ind["rsi"] > 70:
-        score -= 2
-        reasons.append("RSI overbought")
-
-    # MACD
-    if ind["macd"] > ind["macd_signal"]:
-        score += 1
-        reasons.append("MACD bullish crossover")
-    else:
-        score -= 1
-        reasons.append("MACD bearish crossover")
-
-    # EMA Trend
-    if ind["ema_signal"] > 0:
-        score += 1
-        reasons.append("EMA 20 above EMA 50 (Uptrend)")
-    else:
-        score -= 1
-        reasons.append("EMA 20 below EMA 50 (Downtrend)")
-
-    # Volume confirmation
-    if ind["vol_ratio"] > 1.5:
-        score += 1
-        reasons.append("High volume confirmation")
-
-    # Final Signal
-    if score >= 2:
-        signal = "BUY"
-    elif score <= -2:
-     signal = "SELL"
-    else:
-     signal = "HOLD"
-
-    price = ind["price"]
-
-    # Better risk management
-    target_pct = 2.5 if signal == "BUY" else -2.5
-    stop_pct = -1.2 if signal == "BUY" else 1.2
-
-    confidence = min(95, 55 + abs(score) * 10)
+    price = indicators["price"]
 
     return {
         "instrument_key": instrument_key,
-        "signal": signal,
-        "confidence": confidence,
+        "signal": ai.get("signal", "HOLD"),
+        "confidence": ai.get("confidence", 50),
+        "reason": ai.get("reason", "No reason"),
         "price": price,
-        "target": round(price * (1 + target_pct / 100), 2),
-        "stopLoss": round(price * (1 + stop_pct / 100), 2),
-        "holdTime": "1-3 Days",
-        "reasons": reasons,
-        "indicators": ind,
+        "target": round(price * 1.025, 2),
+        "stopLoss": round(price * 0.985, 2),
+        "indicators": indicators,
         "timestamp": datetime.utcnow().isoformat()
     }
 
 
 # ─────────────────────────────────────────
-# Routes
+# ROUTES
 # ─────────────────────────────────────────
 @app.get("/health")
 def health():
@@ -194,11 +208,11 @@ def health():
 
 
 @app.get("/signal/{instrument_key}")
-def get_signal(instrument_key: str):
+def signal(instrument_key: str):
     try:
         return {"signal": generate_signal(instrument_key)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))
 
 
 @app.post("/analyze")
@@ -206,23 +220,22 @@ def analyze(req: AnalyzeRequest):
     try:
         return {"signal": generate_signal(req.instrument_key)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))
 
 
 @app.post("/bulk-signals")
-def bulk_signals(symbols: List[str]):
+def bulk(symbols: List[str]):
     try:
-        results = [generate_signal(sym) for sym in symbols[:10]]
         return {
-            "signals": results,
-            "generatedAt": datetime.utcnow().isoformat()
+            "signals": [generate_signal(s) for s in symbols[:10]],
+            "time": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))
 
 
 # ─────────────────────────────────────────
-# Run Server
+# RUN SERVER
 # ─────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn

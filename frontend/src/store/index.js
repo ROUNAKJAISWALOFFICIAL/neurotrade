@@ -98,7 +98,12 @@ export const useStore = create((set, get) => ({
     localStorage.removeItem('te_token');
     set({ user: null, token: null });
   },
+  // --- Orders ---
+  orders: [],
 
+  setOrders: (orders) => set({ orders }),
+
+ 
   // --- Market data ---
   prices: initPrices(),
   prevPrices: {},
