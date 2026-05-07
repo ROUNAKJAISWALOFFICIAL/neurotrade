@@ -22,7 +22,8 @@ export default function TradeForm({ symbol }) {
   const execPrice = orderType === 'MARKET' ? ltp : parseFloat(price) || ltp;
   const total = execPrice * qty;
   const holding = holdings[symbol];
-  const maxSell = holding?.qty || 0;
+  const maxSell = holding?.qty > 0 ? holding.qty : 0;
+  const canShortSell = side === 'SELL';
 
   const handleSubmit = async () => {
     try {
@@ -115,12 +116,13 @@ export default function TradeForm({ symbol }) {
       {/* Quantity */}
       <div>
         <label className="text-[10px] text-[#5a6478] uppercase tracking-wider block mb-1">
-          Quantity {side === 'SELL' && <span className="text-[#5a6478]">(max: {maxSell})</span>}
+          Quantity {side === 'SELL' && maxSell > 0 && <span className="text-[#5a6478]">(max: {maxSell} long)</span>}
+          {side === 'SELL' && <span className="text-orange-400 text-[9px] ml-2">(short selling enabled)</span>}
         </label>
         <input
           type="number"
           min={1}
-          max={side === 'SELL' ? maxSell : undefined}
+          max={side === 'SELL' && maxSell > 0 ? maxSell : undefined}
           value={qty}
           onChange={e => setQty(Math.max(1, parseInt(e.target.value) || 1))}
           className="w-full bg-[#1a2235] border border-white/10 rounded-lg text-[13px] text-white py-[9px] px-3 outline-none focus:border-indigo-500 font-mono"
@@ -166,7 +168,7 @@ export default function TradeForm({ symbol }) {
             : 'bg-red-600 hover:bg-red-500 text-white'
         }`}
       >
-        {side === 'BUY' ? '↑ Place Buy Order' : '↓ Place Sell Order'}
+        {side === 'BUY' ? '↑ Place Buy Order' : `↓ ${maxSell > 0 ? 'Sell' : 'Short Sell'}`}
       </button>
 
       {/* LTP reference */}

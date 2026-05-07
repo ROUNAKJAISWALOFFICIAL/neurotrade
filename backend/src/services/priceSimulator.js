@@ -114,10 +114,9 @@ const prevPrices = {};
 const dayOpen = {};
 
 Object.keys(STOCKS).forEach((sym) => {
-  const base = STOCKS[sym].basePrice;
-  prices[sym] = base;
-  prevPrices[sym] = base;
-  dayOpen[sym] = null; // will be set from first live tick
+  prices[sym] = 0;        // start empty
+  prevPrices[sym] = 0;
+  dayOpen[sym] = null;
 });
 
 let simulatorInterval = null;
@@ -164,8 +163,15 @@ async function fetchLivePrice(symbol) {
     const firstKey = Object.keys(data)[0];
     const quote = data[firstKey];
 
+    const livePrice = Number(quote.last_price);
+    
+    // Ensure we never return 0 or invalid price
+    if (!livePrice || livePrice <= 0) {
+      throw new Error(`Invalid price received for ${symbol}: ${livePrice}`);
+    }
+
     return {
-      price: Number(quote.last_price),
+      price: livePrice,
       prevClose: Number(quote.ohlc.close),
       high: Number(quote.ohlc.high),
       low: Number(quote.ohlc.low),
@@ -177,11 +183,24 @@ async function fetchLivePrice(symbol) {
       error.response?.data || error.message
     );
 
+    // Return cached price only if available, NEVER fallback to basePrice or 0
+    const cachedPrice = prices[symbol];
+    if (!cachedPrice || cachedPrice <= 0) {
+      console.warn(`⚠️ No valid cached price for ${symbol}, will retry on next interval`);
+      return {
+        price: null,
+        prevClose: dayOpen[symbol] || null,
+        high: null,
+        low: null,
+        volume: 0
+      };
+    }
+
     return {
-      price: prices[symbol],
-      prevClose: dayOpen[symbol] || prices[symbol],
-      high: prices[symbol],
-      low: prices[symbol],
+      price: cachedPrice,
+      prevClose: dayOpen[symbol] || cachedPrice,
+      high: cachedPrice,
+      low: cachedPrice,
       volume: 0
     };
   }
@@ -201,18 +220,30 @@ function startPriceSimulator(io) {
 
     for (const sym of Object.keys(STOCKS)) {
       prevPrices[sym] = prices[sym];
-const liveData = await fetchLivePrice(sym);
+      const liveData = await fetchLivePrice(sym);
 
-prices[sym] = Number(liveData.price);
+      // CRITICAL: Only use Upstox API price, never fallback to basePrice
+      const livePrice = Number(liveData.price);
+      
+      // Skip this symbol if no valid price available
+      if (!livePrice || livePrice <= 0) {
+        console.warn(`⚠️ Skipping ${sym} - no valid live price`);
+        continue;
+      }
 
-// use previous day's closing price from Upstox
-dayOpen[sym] = Number(liveData.prevClose);
+      // Set dayOpen ONLY ONCE per day using prevClose from Upstox
+      if (!dayOpen[sym]) {
+        dayOpen[sym] = Number(liveData.prevClose) || livePrice;
+        console.log(`✅ Set dayOpen[${sym}] = ${dayOpen[sym]}`);
+      }
 
-const price = prices[sym];
-const open = dayOpen[sym];
+      prices[sym] = livePrice;
 
-const change = price - open;
-const changePct = (change / open) * 100;
+      const price = prices[sym];
+      const open = dayOpen[sym];
+
+      const change = price - open;
+      const changePct = (change / open) * 100;
 
       updates.push({
         symbol: sym,
@@ -231,16 +262,20 @@ const changePct = (change / open) * 100;
       });
     }
 
-    io.emit("price:update", updates);
+    if (updates.length > 0) {
+      io.emit("price:update", updates);
 
-    updates.forEach((u) => {
-      io.to(`stock:${u.symbol}`).emit("stock:price", u);
-    });
+      updates.forEach((u) => {
+        io.to(`stock:${u.symbol}`).emit("stock:price", u);
+      });
 
-    console.log("📈 Live prices updated");
+      console.log(`📈 Updated ${updates.length} prices from Upstox`);
+    } else {
+      console.warn("⚠️ No valid prices received from Upstox");
+    }
   }, 15000);
 
-  console.log("📈 Live price feed started");
+  console.log("📈 Live price feed started (Upstox only)");
 }
 
 function stopPriceSimulator() {

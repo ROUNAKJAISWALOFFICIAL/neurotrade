@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const holdingSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   symbol: { type: String, required: true },
-  qty: { type: Number, required: true, default: 0 },
-  avgPrice: { type: Number, required: true, default: 0 },
+  qty: { type: Number, required: true, default: 0 }, // positive = LONG, negative = SHORT
+  avgPrice: { type: Number, required: true, default: 0 }, // entry price
+  positionType: { type: String, enum: ['LONG', 'SHORT'], default: 'LONG' },
   updatedAt: { type: Date, default: Date.now }
 });
 

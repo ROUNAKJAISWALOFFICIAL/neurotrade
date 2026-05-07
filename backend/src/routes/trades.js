@@ -69,18 +69,37 @@ router.post('/execute', auth, async (req, res) => {
       user.balance -= totalCost;
 
       if (!holding) {
+        // Create new LONG position
         holding = new Holding({
           userId,
           symbol,
           qty,
-          avgPrice: price
+          avgPrice: price,
+          positionType: 'LONG'
         });
+      } else if (holding.positionType === 'SHORT') {
+        // Cover SHORT position first
+        if (qty <= Math.abs(holding.qty)) {
+          // Fully or partially cover short
+          tradePnl = (holding.avgPrice - price) * qty;
+          holding.qty += qty; // Make less negative
+          if (holding.qty === 0) {
+            await Holding.deleteOne({ _id: holding._id });
+            holding = null;
+          }
+        } else {
+          // Cover all short and go long with remaining
+          tradePnl = (holding.avgPrice - price) * Math.abs(holding.qty);
+          const remainingQty = qty - Math.abs(holding.qty);
+          holding.qty = remainingQty;
+          holding.avgPrice = price;
+          holding.positionType = 'LONG';
+        }
       } else {
+        // Add to existing LONG position
         const newQty = holding.qty + qty;
-
         holding.avgPrice =
           (holding.avgPrice * holding.qty + totalCost) / newQty;
-
         holding.qty = newQty;
       }
     }
@@ -88,19 +107,44 @@ router.post('/execute', auth, async (req, res) => {
     // ───────────────── SELL ─────────────────
     else if (side === 'SELL') {
 
-      if (!holding || holding.qty < qty) {
-        return res.status(400).json({ error: 'Insufficient holdings' });
-      }
-
-      tradePnl = (price - holding.avgPrice) * qty;
-
-      user.balance += totalCost;
-
-      holding.qty -= qty;
-
-      if (holding.qty === 0) {
-        await Holding.deleteOne({ _id: holding._id });
-        holding = null;
+      if (!holding) {
+        // Create new SHORT position
+        holding = new Holding({
+          userId,
+          symbol,
+          qty: -qty, // Store as negative for shorts
+          avgPrice: price,
+          positionType: 'SHORT'
+        });
+        user.balance += totalCost; // Credit proceeds from short sale
+      } else if (holding.positionType === 'LONG') {
+        // Sell from LONG position first
+        if (qty <= holding.qty) {
+          // Fully or partially sell long
+          tradePnl = (price - holding.avgPrice) * qty;
+          holding.qty -= qty;
+          user.balance += totalCost;
+          if (holding.qty === 0) {
+            await Holding.deleteOne({ _id: holding._id });
+            holding = null;
+          }
+        } else {
+          // Sell all long and go short with remaining
+          tradePnl = (price - holding.avgPrice) * holding.qty;
+          user.balance += (holding.qty * price); // Credit from selling long
+          const remainingQty = qty - holding.qty;
+          holding.qty = -remainingQty; // Store as negative
+          holding.avgPrice = price;
+          holding.positionType = 'SHORT';
+          user.balance += (remainingQty * price); // Credit from short sale
+        }
+      } else {
+        // Add to existing SHORT position
+        const absQty = Math.abs(holding.qty);
+        const newAbsQty = absQty + qty;
+        holding.avgPrice = (holding.avgPrice * absQty + totalCost) / newAbsQty;
+        holding.qty = -newAbsQty; // Keep negative for shorts
+        user.balance += totalCost; // Credit proceeds from short sale
       }
     }
 
