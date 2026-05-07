@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore, STOCKS } from '../store';
 import { fmtPrice, fmtPct } from '../utils/format';
+import api from '../utils/api';
 
 const NAV = [
   { to: '/',         label: 'Dash',   icon: 'M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z' },
@@ -44,13 +45,87 @@ function TickerStrip() {
 }
 
 export default function Layout() {
-  const { user, page } = useStore();
+  const { user, setUser, logout } = useStore();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [showLogoutMenu, setShowLogoutMenu] = useState(false);
+
+  // Fetch current user on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get('/auth/me');
+        if (res.data?.user) {
+          setUser(res.data.user);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!user) {
+      fetchUser();
+    }
+  }, [user, setUser]);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#0a0e1a]">
       {/* Ticker */}
       <TickerStrip />
+
+      {/* Top Header with User Info */}
+      <div className="h-[50px] bg-[#111827] border-b border-white/[0.06] flex items-center justify-between px-6">
+        <div className="text-[12px] text-[#8b95a8] font-mono">
+          TradeEdge
+        </div>
+        
+        {/* User Info and Logout */}
+        <div className="flex items-center gap-4 relative">
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[13px] text-indigo-400 font-semibold">
+                {user.username}
+              </span>
+              <div className="w-8 h-8 rounded-full bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center">
+                <span className="font-mono text-indigo-400 text-[11px] font-semibold">
+                  {user.username?.slice(0, 1).toUpperCase()}
+                </span>
+              </div>
+              
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/[0.08] transition-colors duration-200 text-[#8b95a8] hover:text-red-400"
+                title="Logout"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-5 h-5"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <span className="text-[12px] text-[#8b95a8]">Loading...</span>
+          )}
+        </div>
+      </div>
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
