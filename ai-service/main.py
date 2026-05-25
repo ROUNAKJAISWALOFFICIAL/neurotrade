@@ -178,15 +178,20 @@ Format:
 def generate_signal(instrument_key: str):
     df = fetch_candles(instrument_key)
     indicators = compute_indicators(df)
-    ai = gemini_sentiment(indicators)
+    def rule_engine(ind):
+     if ind["rsi"] < 30 and ind["trend"] == "UP":
+        return "BUY"
+     elif ind["rsi"] > 70 and ind["trend"] == "DOWN":
+        return "SELL"
+    return "HOLD"
 
     price = indicators["price"]
 
     return {
         "instrument_key": instrument_key,
-        "signal": ai.get("signal", "HOLD"),
-        "confidence": ai.get("confidence", 50),
-        "reason": ai.get("reason", "No reason"),
+        "signal": rule_engine(indicators),
+        "confidence": 50,
+        "reason": "Rule-based signal",
         "price": price,
         "target": round(price * 1.025, 2),
         "stopLoss": round(price * 0.985, 2),

@@ -37,19 +37,26 @@ const STOCKS = {
     exchange: "NSE",
     instrumentKey: "NSE_EQ|INE075A01022"
   },
-  "TITAN.NS": {
-    name: "Titan Company",
-    basePrice: 3350,
-    sector: "Consumer",
+  "ICICIBANK.NS": {
+    name: "ICICI Bank",
+    basePrice: 1024,
+    sector: "Banking",
     exchange: "NSE",
-    instrumentKey: "NSE_EQ|INE280A01028"
+    instrumentKey: "NSE_EQ|INE090A01021"
   },
-  "ONGC.NS": {
-    name: "ONGC",
-    basePrice: 265,
-    sector: "Energy",
+  "SBIN.NS": {
+    name: "State Bank of India",
+    basePrice: 812,
+    sector: "Banking",
     exchange: "NSE",
-    instrumentKey: "NSE_EQ|INE213A01029"
+    instrumentKey: "NSE_EQ|INE062A01020"
+  },
+  "AXISBANK.NS": {
+    name: "Axis Bank",
+    basePrice: 1105,
+    sector: "Banking",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE238A01034"
   },
   "BAJFINANCE.NS": {
     name: "Bajaj Finance",
@@ -72,20 +79,6 @@ const STOCKS = {
     exchange: "NSE",
     instrumentKey: "NSE_EQ|INE081A01020"
   },
-  "ICICIBANK.NS": {
-    name: "ICICI Bank",
-    basePrice: 1024,
-    sector: "Banking",
-    exchange: "NSE",
-    instrumentKey: "NSE_EQ|INE090A01021"
-  },
-  "SBIN.NS": {
-    name: "State Bank of India",
-    basePrice: 812,
-    sector: "Banking",
-    exchange: "NSE",
-    instrumentKey: "NSE_EQ|INE062A01020"
-  },
   "SUNPHARMA.NS": {
     name: "Sun Pharma",
     basePrice: 1580,
@@ -100,12 +93,201 @@ const STOCKS = {
     exchange: "NSE",
     instrumentKey: "NSE_EQ|INE030A01027"
   },
-  "AXISBANK.NS": {
-    name: "Axis Bank",
-    basePrice: 1105,
-    sector: "Banking",
+  "NTPC.NS": {
+    name: "NTPC Ltd",
+    basePrice: 245,
+    sector: "Power",
     exchange: "NSE",
-    instrumentKey: "NSE_EQ|INE238A01034"
+    instrumentKey: "NSE_EQ|INE733E01010"
+  },
+  "POWERGRID.NS": {
+    name: "Power Grid Corporation",
+    basePrice: 230,
+    sector: "Power",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE752E01010"
+  },
+  "BHARTIARTL.NS": {
+    name: "Bharti Airtel",
+    basePrice: 910,
+    sector: "Telecom",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE397D01024"
+  },
+  "HCLTECH.NS": {
+    name: "HCL Technologies",
+    basePrice: 1100,
+    sector: "IT",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE860A01027"
+  },
+  "TECHM.NS": {
+    name: "Tech Mahindra",
+    basePrice: 1480,
+    sector: "IT",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE669C01036"
+  },
+  "LT.NS": {
+    name: "Larsen & Toubro",
+    basePrice: 3200,
+    sector: "Engineering",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE018A01030"
+  },
+  "NESTLEIND.NS": {
+    name: "Nestle India",
+    basePrice: 26000,
+    sector: "FMCG",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE239A01016"
+  },
+  "ASIANPAINT.NS": {
+    name: "Asian Paints",
+    basePrice: 4100,
+    sector: "Consumer",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE021A01026"
+  },
+  "ADANIENT.NS": {
+    name: "Adani Enterprises",
+    basePrice: 3900,
+    sector: "Conglomerate",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE742E01027"
+  },
+  "ADANIPORTS.NS": {
+    name: "Adani Ports",
+    basePrice: 800,
+    sector: "Ports",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE742E01010"
+  },
+  "JSWSTEEL.NS": {
+    name: "JSW Steel",
+    basePrice: 780,
+    sector: "Metals",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE019A01026"
+  },
+  "ULTRACEMCO.NS": {
+    name: "Ultratech Cement",
+    basePrice: 9700,
+    sector: "Cement",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE481G01026"
+  },
+  "BPCL.NS": {
+    name: "BPCL",
+    basePrice: 550,
+    sector: "Energy",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE029A01011"
+  },
+  "ITC.NS": {
+    name: "ITC Ltd",
+    basePrice: 490,
+    sector: "FMCG",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE154A01025"
+  },
+  "DRREDDY.NS": {
+    name: "Dr. Reddy's Laboratories",
+    basePrice: 5200,
+    sector: "Pharma",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE089A01023"
+  },
+  "M&M.NS": {
+    name: "Mahindra & Mahindra",
+    basePrice: 1850,
+    sector: "Auto",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE101A01026"
+  },
+  "TATAMOTORS.NS": {
+    name: "Tata Motors",
+    basePrice: 550,
+    sector: "Auto",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE02DJ01018"
+  },
+  "DIVISLAB.NS": {
+    name: "Divi's Laboratories",
+    basePrice: 4200,
+    sector: "Pharma",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE361B01024"
+  },
+  "SBILIFE.NS": {
+    name: "SBI Life Insurance",
+    basePrice: 1310,
+    sector: "Insurance",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE123W01016"
+  },
+  "BAJAJFINSV.NS": {
+    name: "Bajaj Finserv",
+    basePrice: 18600,
+    sector: "Finance",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE918I01026"
+  },
+  "JSWENERGY.NS": {
+    name: "JSW Energy",
+    basePrice: 375,
+    sector: "Power",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE854D01010"
+  },
+  "TATAPOWER.NS": {
+    name: "Tata Power",
+    basePrice: 455,
+    sector: "Power",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE245A01021"
+  },
+  "ADANIPOWER.NS": {
+    name: "Adani Power",
+    basePrice: 325,
+    sector: "Power",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE814H01011"
+  },
+  "GAIL.NS": {
+    name: "GAIL (India)",
+    basePrice: 145,
+    sector: "Energy",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE129A01019"
+  },
+  "COALINDIA.NS": {
+    name: "Coal India",
+    basePrice: 210,
+    sector: "Mining",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE091A01013"
+  },
+  "HDFC.NS": {
+    name: "Housing Development Finance Corp",
+    basePrice: 2850,
+    sector: "Finance",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE001A01036"
+  },
+  "CIPLA.NS": {
+    name: "Cipla Ltd",
+    basePrice: 1280,
+    sector: "Pharma",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE059A01026"
+  },
+  "BRITANNIA.NS": {
+    name: "Britannia Industries",
+    basePrice: 4300,
+    sector: "FMCG",
+    exchange: "NSE",
+    instrumentKey: "NSE_EQ|INE016A01026"
   }
 };
 

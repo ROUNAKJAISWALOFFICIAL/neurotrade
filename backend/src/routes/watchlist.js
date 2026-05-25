@@ -12,7 +12,14 @@ const DEFAULT_WATCHLIST = [
   { symbol: 'TCS.NS', stockName: 'Tata Consultancy Services', exchange: 'NSE', sector: 'IT' },
   { symbol: 'INFY.NS', stockName: 'Infosys Ltd', exchange: 'NSE', sector: 'IT' },
   { symbol: 'HDFCBANK.NS', stockName: 'HDFC Bank', exchange: 'NSE', sector: 'Banking' },
-  { symbol: 'BAJFINANCE.NS', stockName: 'Bajaj Finance', exchange: 'NSE', sector: 'Finance' },
+  { symbol: 'ICICIBANK.NS', stockName: 'ICICI Bank', exchange: 'NSE', sector: 'Banking' },
+  { symbol: 'SBIN.NS', stockName: 'State Bank of India', exchange: 'NSE', sector: 'Banking' },
+  { symbol: 'AXISBANK.NS', stockName: 'Axis Bank', exchange: 'NSE', sector: 'Banking' },
+  { symbol: 'HINDUNILVR.NS', stockName: 'Hindustan Unilever', exchange: 'NSE', sector: 'FMCG' },
+  { symbol: 'NTPC.NS', stockName: 'NTPC Ltd', exchange: 'NSE', sector: 'Power' },
+  { symbol: 'POWERGRID.NS', stockName: 'Power Grid Corporation', exchange: 'NSE', sector: 'Power' },
+  { symbol: 'TATASTEEL.NS', stockName: 'Tata Steel', exchange: 'NSE', sector: 'Metals' },
+  { symbol: 'ADANIENT.NS', stockName: 'Adani Enterprises', exchange: 'NSE', sector: 'Conglomerate' },
 ];
 
 // Get watchlist
