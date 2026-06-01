@@ -120,7 +120,7 @@ export default function AISignals() {
             AI Signal Engine
           </h1>
           <p className="text-[12px] text-[#5a6478] mt-1">
-            Real Python AI + Upstox analysis · Auto-refreshes every 20s
+            Real Python AI + Upstox analysis · Auto-refreshes every 60s
           </p>
         </div>
 

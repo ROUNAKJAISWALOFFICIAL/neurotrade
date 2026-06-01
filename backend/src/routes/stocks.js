@@ -132,7 +132,7 @@ router.get('/history/:symbol', async (req, res) => {
 
     const url = isIntraday
       ? `/historical-candle/intraday/${instrumentKey}/${upstoxInterval}`
-      : `/historical-candle/${instrumentKey}/${upstoxInterval}/${toDate}/${fromDate}`;
+      : `/historical-candle/${instrumentKey}/${upstoxInterval}/${fromDate}/${toDate}`;
 
     const { data } = await upstox.get(url);
     const rawCandles = data?.data?.candles || [];
